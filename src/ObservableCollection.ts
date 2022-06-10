@@ -1,7 +1,7 @@
-import { Observable ,  Subscriber } from 'rxjs';
+import { Observable, Subscriber } from "rxjs";
 
-import { ObservableCursor } from './ObservableCursor';
-import { removeObserver } from './utils';
+import { ObservableCursor } from "./ObservableCursor";
+import { removeObserver } from "./utils";
 
 import Selector = Mongo.Selector;
 import ObjectID = Mongo.ObjectID;
@@ -10,20 +10,23 @@ import FieldSpecifier = Mongo.FieldSpecifier;
 import Modifier = Mongo.Modifier;
 
 export module MongoObservable {
-  'use strict';
+  "use strict";
 
   export interface ConstructorOptions {
     connection?: Object;
     idGeneration?: string;
-    transform?: Function;
   }
 
   export interface AllowDenyOptionsObject<T> {
     insert?: (userId: string, doc: T) => boolean;
-    update?: (userId: string, doc: T, fieldNames: string[], modifier: any) => boolean;
+    update?: (
+      userId: string,
+      doc: T,
+      fieldNames: string[],
+      modifier: any
+    ) => boolean;
     remove?: (userId: string, doc: T) => boolean;
     fetch?: string[];
-    transform?: Function;
   }
 
   /**
@@ -33,7 +36,9 @@ export module MongoObservable {
    *  @returns {MongoObservable.Collection} - Wrapped collection.
    *  @static
    */
-  export function fromExisting<T>(collection: Mongo.Collection<T>): MongoObservable.Collection<T> {
+  export function fromExisting<T>(
+    collection: Mongo.Collection<T>
+  ): MongoObservable.Collection<T> {
     return new MongoObservable.Collection(collection);
   }
 
@@ -56,12 +61,17 @@ export module MongoObservable {
      *  @param {ConstructorOptions} options - Creation options.
      *  @constructor
      */
-    constructor(nameOrExisting: string | Mongo.Collection<T>,
-                options?: ConstructorOptions) {
+    constructor(
+      nameOrExisting: string | Mongo.Collection<T>,
+      options?: ConstructorOptions
+    ) {
       if (nameOrExisting instanceof Mongo.Collection) {
         this._collection = nameOrExisting;
       } else {
-        this._collection = new Mongo.Collection<T>(<string>nameOrExisting, options);
+        this._collection = new Mongo.Collection<T>(
+          <string>nameOrExisting,
+          options
+        );
       }
     }
 
@@ -124,18 +134,16 @@ export module MongoObservable {
      *
      * @see {@link https://docs.meteor.com/api/collections.html#Mongo-Collection-insert|insert on Meteor documentation}
      */
-    insert(doc: T): Observable<string> {
+    insert(doc: UnionOmit<T, "_id">): Observable<string> {
       let observers: Subscriber<string>[] = [];
       let obs = this._createObservable<string>(observers);
 
-      this._collection.insert(doc,
-        (error: Meteor.Error, docId: string) => {
-          observers.forEach(observer => {
-            error ? observer.error(error) :
-              observer.next(docId);
-            observer.complete();
-          });
+      this._collection.insert(doc, (error: Meteor.Error, docId: string) => {
+        observers.forEach((observer) => {
+          error ? observer.error(error) : observer.next(docId);
+          observer.complete();
         });
+      });
       return obs;
     }
 
@@ -147,18 +155,19 @@ export module MongoObservable {
      *
      * @see {@link https://docs.meteor.com/api/collections.html#Mongo-Collection-remove|remove on Meteor documentation}
      */
-    remove(selector: Selector | ObjectID | string): Observable<number> {
+    remove(selector: Selector<T> | ObjectID | string): Observable<number> {
       let observers: Subscriber<number>[] = [];
       let obs = this._createObservable<number>(observers);
 
-      this._collection.remove(selector,
+      this._collection.remove(
+        selector,
         (error: Meteor.Error, removed: number) => {
-          observers.forEach(observer => {
-            error ? observer.error(error) :
-              observer.next(removed);
+          observers.forEach((observer) => {
+            error ? observer.error(error) : observer.next(removed);
             observer.complete();
           });
-        });
+        }
+      );
 
       return obs;
     }
@@ -174,20 +183,25 @@ export module MongoObservable {
      *
      * @see {@link https://docs.meteor.com/api/collections.html#Mongo-Collection-update|update on Meteor documentation}
      */
-    update(selector: Selector | ObjectID | string,
-           modifier: Modifier,
-           options?: { multi?: boolean; upsert?: boolean; }): Observable<number> {
+    update(
+      selector: Selector<T> | ObjectID | string,
+      modifier: Modifier<T>,
+      options?: { multi?: boolean; upsert?: boolean }
+    ): Observable<number> {
       let observers: Subscriber<number>[] = [];
       let obs = this._createObservable<number>(observers);
 
-      this._collection.update(selector, modifier, options,
+      this._collection.update(
+        selector,
+        modifier,
+        options,
         (error: Meteor.Error, updated: number) => {
-          observers.forEach(observer => {
-            error ? observer.error(error) :
-              observer.next(updated);
+          observers.forEach((observer) => {
+            error ? observer.error(error) : observer.next(updated);
             observer.complete();
           });
-        });
+        }
+      );
 
       return obs;
     }
@@ -204,20 +218,25 @@ export module MongoObservable {
      *
      * @see {@link https://docs.meteor.com/api/collections.html#Mongo-Collection-upsert|upsert on Meteor documentation}
      */
-    upsert(selector: Selector | ObjectID | string,
-           modifier: Modifier,
-           options?: { multi?: boolean; }): Observable<number> {
+    upsert(
+      selector: Selector<T> | ObjectID | string,
+      modifier: Modifier<T>,
+      options?: { multi?: boolean }
+    ): Observable<number> {
       let observers: Subscriber<number>[] = [];
       let obs = this._createObservable<number>(observers);
 
-      this._collection.upsert(selector, modifier, options,
+      this._collection.upsert(
+        selector,
+        modifier,
+        options,
         (error: Meteor.Error, affected: number) => {
-          observers.forEach(observer => {
-            error ? observer.error(error) :
-              observer.next(affected);
+          observers.forEach((observer) => {
+            error ? observer.error(error) : observer.next(affected);
             observer.complete();
           });
-        });
+        }
+      );
 
       return obs;
     }
@@ -241,16 +260,18 @@ export module MongoObservable {
      *
      * @see {@link https://docs.meteor.com/api/collections.html#Mongo-Collection-find|find on Meteor documentation}
      */
-    find(selector?: Selector | ObjectID | string, options?: {
-      sort?: SortSpecifier;
-      skip?: number;
-      limit?: number;
-      fields?: FieldSpecifier;
-      reactive?: boolean;
-      transform?: Function;
-    }): ObservableCursor<T> {
-      const cursor = this._collection.find.apply(
-        this._collection, arguments);
+    find(
+      selector?: Selector<T> | ObjectID | string,
+      options?: {
+        sort?: SortSpecifier;
+        skip?: number;
+        limit?: number;
+        fields?: FieldSpecifier;
+        reactive?: boolean;
+        transform?: Function;
+      }
+    ): ObservableCursor<T> {
+      const cursor = this._collection.find.apply(this._collection, arguments);
       return ObservableCursor.create<T>(cursor);
     }
 
@@ -263,19 +284,21 @@ export module MongoObservable {
      *
      * @see {@link https://docs.meteor.com/api/collections.html#Mongo-Collection-findOne|findOne on Meteor documentation}
      */
-    findOne(selector?: Selector | ObjectID | string, options?: {
-      sort?: SortSpecifier;
-      skip?: number;
-      fields?: FieldSpecifier;
-      reactive?: boolean;
-      transform?: Function;
-    }): T {
-      return this._collection.findOne.apply(
-        this._collection, arguments);
+    findOne(
+      selector?: Selector<T> | ObjectID | string,
+      options?: {
+        sort?: SortSpecifier;
+        skip?: number;
+        fields?: FieldSpecifier;
+        reactive?: boolean;
+        transform?: Function;
+      }
+    ): T {
+      return this._collection.findOne.apply(this._collection, arguments);
     }
 
     private _createObservable<T>(observers: Subscriber<T>[]) {
-      return Observable.create((observer: Subscriber<T>) => {
+      return new Observable((observer: Subscriber<T>) => {
         observers.push(observer);
         return () => {
           removeObserver(observers, observer);
@@ -284,7 +307,6 @@ export module MongoObservable {
     }
   }
 }
-
 
 /**
  * An options object for MongoDB queries.
